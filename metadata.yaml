@@ -1,25 +1,13 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-name: data-platform-libs
-display-name: Data Platform Libs
-summary: Data platform libraries.
+name: mlops-libs
+display-name: MLOps Libs
+summary: MLOps libraries.
 description: |
-  This library is a uniform interface to a selection of common database
-  metadata, with added custom events that add convenience to database management,
-  and methods to set the application related data.
-
-  The charm provides libraries for both bare-metal/virtual-machines and K8s.
-
+  A charm repository that contains helpful charm libraries curated by the
+  Canonical MLOps charming team.
   NOTE: This charm is not meant to be deployed
-docs: https://discourse.charmhub.io/t/data-platform-libs-documentation/10955
-source: https://github.com/canonical/data-platform-libs
-issues: https://github.com/canonical/data-platform-libs/issues
-website:
-  - https://ubuntu.com/data
-  - https://charmhub.io/data-platform-libs
-  - https://github.com/canonical/data-platform-libs
-  - https://launchpad.net/~data-platform
-  - https://chat.charmhub.io/charmhub/channels/data-platform
-maintainers:
-  - Data Platform Team <data-platform@lists.launchpad.net>
+source: https://github.com/canonical/mlops-libs
+website: https://charmed-kubeflow.io/
+issues: https://github.com/canonical/mlops-libs/issues
