@@ -10,7 +10,6 @@ name: On Push
 on:
   push:
     branches:
-    - master
     - main
     - track/**
 
