@@ -87,9 +87,10 @@ The data shared by this library is:
 import logging
 from typing import List, Optional, Union
 
-from ops.framework import Object
-from ops.model import CharmBase, Relation
-from ops.framework import BoundEvent, EventBase, EventSource, Object, ObjectEvents
+from ops.charm import CharmBase
+from ops.framework import BoundEvent, Object
+from ops.model import Relation
+
 # The unique Charmhub library identifier, never change it
 LIBID = "f5c3f6cc023e40468d6f9a871e8afcd0"
 
@@ -202,33 +203,45 @@ class KubernetesServiceInfoRequirer(Object):
             "svc_port": relation_data["svc_port"],
         }
 
+
 class KubernetesServiceInfoProvider(Object):
     """Base class that represents a provider relation end.
 
     Args:
         provider_charm (CharmBase): the provider application
         relation_name (str, optional): the name of the relation
-        refresh_event: (list, optional): list of BoundEvents that this manager should handle.  Use this to update
-                       the data sent on this relation on demand.
         svc_name (str): the name of the Kubernetes Service the provider knows about
         svc_port (str): the port number of the Kubernetes Service the provider knows about
+        refresh_event: (list, optional): list of BoundEvents that this manager should handle.  Use this to update
+                       the data sent on this relation on demand.
 
     Attributes:
         provider_charm (CharmBase): variable for storing the provider application
         relation_name (str): variable for storing the name of the relation
     """
 
-    def __init__(self, provider_charm, relation_name: str = DEFAULT_RELATION_NAME, refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None, svc_name: str, svc_port: str):
+    def __init__(
+        self,
+        provider_charm: CharmBase,
+        relation_name: str,
+        svc_name: str,
+        svc_port: str,
+        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+    ):
         super().__init__(provider_charm, relation_name)
         self.provider_charm = provider_charm
         self.relation_name = relation_name
-        self._requirer_wrapper = KubernetesServiceInfoProviderWrapper(self.provider_charm, self.relation_name)
+        self._requirer_wrapper = KubernetesServiceInfoProviderWrapper(
+            self.provider_charm, self.relation_name
+        )
         self._svc_name = svc_name
         self._svc_port = svc_port
 
         self.framework.observe(self.provider_charm.on.leader_elected, self._send_k8s_svc_info)
 
-        self.framework.observe(self.provider_charm.on[self.relation_name].relation_crated, self._send_k8s_svc_info)
+        self.framework.observe(
+            self.provider_charm.on[self.relation_name].relation_crated, self._send_k8s_svc_info
+        )
 
         if refresh_event:
             if not isinstance(refresh_event, (tuple, list)):
@@ -253,7 +266,7 @@ class KubernetesServiceInfoProviderWrapper(Object):
         relation_name (str): variable for storing the name of the relation
     """
 
-    def __init__(self, provider_charm, relation_name: str = DEFAULT_RELATION_NAME):
+    def __init__(self, provider_charm: CharmBase, relation_name: str):
         super().__init__(provider_charm, relation_name)
         self.provider_charm = provider_charm
         self.relation_name = relation_name

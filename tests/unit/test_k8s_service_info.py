@@ -4,7 +4,7 @@
 
 import pytest
 from charms.mlops_libs.v0.k8s_service_info import (
-    KubernetesServiceInfoProvider,
+    KubernetesServiceInfoProviderWrapper,
     KubernetesServiceInfoRelationDataMissingError,
     KubernetesServiceInfoRelationMissingError,
     KubernetesServiceInfoRequirer,
@@ -117,7 +117,7 @@ def test_preflight_checks_raise_no_relation_data(requirer_charm_harness):
 
     with pytest.raises(KubernetesServiceInfoRelationDataMissingError) as error:
         requirer_charm_harness.charm._k8s_svc_info_requirer.get_k8s_svc_info()
-    assert str(error.value) == "No data found in relation data bag."
+    assert str(error.value) == f"No data found in relation {TEST_RELATION_NAME} data bag."
 
 
 def test_preflight_checks_raises_data_missing_attribute(requirer_charm_harness):
@@ -140,7 +140,7 @@ def test_preflight_checks_raises_data_missing_attribute(requirer_charm_harness):
 
     with pytest.raises(KubernetesServiceInfoRelationDataMissingError) as error:
         requirer_charm_harness.charm._k8s_svc_info_requirer.get_k8s_svc_info()
-    assert str(error.value) == "Missing attributes: ['svc_port']"
+    assert str(error.value) == f"Missing attributes: ['svc_port'] in relation {TEST_RELATION_NAME}"
 
 
 def test_send_relation_data_passes(provider_charm_harness):
@@ -153,8 +153,9 @@ def test_send_relation_data_passes(provider_charm_harness):
     provider_charm_harness.add_relation(TEST_RELATION_NAME, "app")
 
     # Instantiate KubernetesServiceInfoRequirer class
-    provider_charm_harness.charm._k8s_svc_info_provider = KubernetesServiceInfoProvider(
-        provider_charm_harness.charm, relation_name=TEST_RELATION_NAME
+    provider_charm_harness.charm._k8s_svc_info_provider = KubernetesServiceInfoProviderWrapper(
+        provider_charm_harness.charm,
+        relation_name=TEST_RELATION_NAME,
     )
 
     # Add and update relation
@@ -162,7 +163,7 @@ def test_send_relation_data_passes(provider_charm_harness):
 
     relation_data = {"svc_name": "some-service", "svc_port": "7878"}
     provider_charm_harness.charm._k8s_svc_info_provider.send_k8s_svc_info_relation_data(
-        **relation_data
+        svc_name=relation_data["svc_name"], svc_port=relation_data["svc_port"]
     )
     relations = provider_charm_harness.model.relations[TEST_RELATION_NAME]
     for relation in relations:
