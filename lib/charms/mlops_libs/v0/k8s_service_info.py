@@ -43,7 +43,7 @@ class RequirerCharm(CharmBase):
     def some_event_function():
         # use the getter function wherever the info is needed
         try:
-            k8s_svc_info_data = self._k8s_svc_info_requirer.get_k8s_svc_info()
+            k8s_svc_info_data = self._k8s_svc_info_requirer.get_data()
         except KubernetesServiceInfoRelationError as error:
             "your error handler goes here"
 ```
@@ -71,7 +71,7 @@ class ProviderCharm(CharmBase):
     def _some_event_handler(self, ...):
         # This will update the relation data bag with the Service name and port
         try:
-            self._k8s_svc_info_provider.send_k8s_svc_info(svc_name, svc_port)
+            self._k8s_svc_info_provider.send_data(svc_name, svc_port)
         except KubernetesServiceInfoRelationError as error:
             "your error handler goes here"
 ```
@@ -90,6 +90,7 @@ from typing import List, Optional, Union
 from ops.charm import CharmBase
 from ops.framework import BoundEvent, Object
 from ops.model import Relation
+from pydantic import BaseModel
 
 # The unique Charmhub library identifier, never change it
 LIBID = "f5c3f6cc023e40468d6f9a871e8afcd0"
@@ -103,7 +104,7 @@ LIBPATCH = 1
 
 # Default relation and interface names. If changed, consistency must be kept
 # across the provider and requirer.
-DEFAULT_RELATION_NAME = "k8s-svc-info"
+DEFAULT_RELATION_NAME = "k8s-service-info"
 DEFAULT_INTERFACE_NAME = "k8s-service"
 REQUIRED_ATTRIBUTES = ["svc_name", "svc_port"]
 
@@ -120,7 +121,7 @@ class KubernetesServiceInfoRelationMissingError(KubernetesServiceInfoRelationErr
     """Exception to raise when the relation is missing on either end."""
 
     def __init__(self):
-        self.message = "Missing k8s-svc-info relation."
+        self.message = "Missing relation with a k8s service info provider."
         super().__init__(self.message)
 
 
@@ -130,6 +131,18 @@ class KubernetesServiceInfoRelationDataMissingError(KubernetesServiceInfoRelatio
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+
+
+class KubernetesServiceInfoObject(BaseModel):
+    """Representation of a Kubernetes Service info object.
+
+    Args:
+        name: The name of the Service
+        port: The port of the Service
+    """
+
+    name: str
+    port: str
 
 
 class KubernetesServiceInfoRequirer(Object):
@@ -143,12 +156,12 @@ class KubernetesServiceInfoRequirer(Object):
         relation_name (str): variable for storing the name of the relation
     """
 
-    def __init__(self, requirer_charm, relation_name: str = DEFAULT_RELATION_NAME):
+    def __init__(self, requirer_charm, relation_name: Optional[str] = DEFAULT_RELATION_NAME):
         super().__init__(requirer_charm, relation_name)
         self.relation_name = relation_name
 
     @staticmethod
-    def _relation_preflight_checks(relation: Relation) -> None:
+    def _validate_relation(relation: Relation) -> None:
         """Series of checks for the relation and relation data.
 
         Args:
@@ -183,95 +196,92 @@ class KubernetesServiceInfoRequirer(Object):
                 f"Missing attributes: {missing_attributes} in relation {relation.name}"
             )
 
-    def get_k8s_svc_info(self) -> dict:
-        """Return a dictionary with the Kubernetes Service information.
+    def get_data(self) -> KubernetesServiceInfoObject:
+        """Return a KubernetesServiceInfoObject containing Kubernetes Service information.
 
         Raises:
             KubernetesServiceInfoRelationDataMissingError: if data is missing entirely or some attributes
             KubernetesServiceInfoRelationMissingError: if there is no related application
         """
-        # Run pre-flight checks
+        # Validate relation data
         # Raises TooManyRelatedAppsError if related to more than one app
         relation = self.model.get_relation(self.relation_name)
-        self._relation_preflight_checks(relation=relation)
+        self._validate_relation(relation=relation)
 
         # Get relation data from remote app
         relation_data = relation.data[relation.app]
 
-        return {
-            "svc_name": relation_data["svc_name"],
-            "svc_port": relation_data["svc_port"],
-        }
+        return KubernetesServiceInfoObject(
+            name=relation_data["svc_name"], port=relation_data["svc_port"]
+        )
 
 
 class KubernetesServiceInfoProvider(Object):
-    """Base class that represents a provider relation end.
+    """Base class that represents the provider end of the Kubernetes Service info relation.
 
     Args:
-        provider_charm (CharmBase): the provider application
-        relation_name (str, optional): the name of the relation
+        charm (CharmBase): the provider application
         svc_name (str): the name of the Kubernetes Service the provider knows about
         svc_port (str): the port number of the Kubernetes Service the provider knows about
         refresh_event: (list, optional): list of BoundEvents that this manager should handle.  Use this to update
                        the data sent on this relation on demand.
+        relation_name (str, optional): the name of the relation
 
     Attributes:
-        provider_charm (CharmBase): variable for storing the provider application
+        charm (CharmBase): variable for storing the provider application
         relation_name (str): variable for storing the name of the relation
     """
 
     def __init__(
         self,
-        provider_charm: CharmBase,
-        relation_name: str,
+        charm: CharmBase,
         svc_name: str,
         svc_port: str,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+        relation_name: Optional[str] = DEFAULT_RELATION_NAME,
     ):
-        super().__init__(provider_charm, relation_name)
-        self.provider_charm = provider_charm
+        super().__init__(charm, relation_name)
+        self.charm = charm
         self.relation_name = relation_name
         self._requirer_wrapper = KubernetesServiceInfoProviderWrapper(
-            self.provider_charm, self.relation_name
+            self.charm, self.relation_name
         )
         self._svc_name = svc_name
         self._svc_port = svc_port
 
-        self.framework.observe(self.provider_charm.on.leader_elected, self._send_k8s_svc_info)
+        self.framework.observe(self.charm.on.leader_elected, self._send_data)
 
-        self.framework.observe(
-            self.provider_charm.on[self.relation_name].relation_crated, self._send_k8s_svc_info
-        )
+        self.framework.observe(self.charm.on[self.relation_name].relation_created, self._send_data)
 
         if refresh_event:
             if not isinstance(refresh_event, (tuple, list)):
                 refresh_event = [refresh_event]
             for evt in refresh_event:
-                self.framework.observe(evt, self._send_k8s_svc_info)
+                self.framework.observe(evt, self._send_data)
 
-        def _send_k8s_svc_info(self, _):
-            """Serve as an event handler for sending the Kubernetes Service information."""
-            self._requirer_wrapper.send_k8s_svc_info_relation_data(self._svc_name, self._svc_port)
+    def _send_data(self, _):
+        """Serve as an event handler for sending the Kubernetes Service information."""
+        self._requirer_wrapper.send_data(self._svc_name, self._svc_port)
 
 
 class KubernetesServiceInfoProviderWrapper(Object):
-    """Base class that represents a provider relation end.
+    """Wrapper for the relation data sending logic.
 
     Args:
-        provider_charm (CharmBase): the provider application
+        charm (CharmBase): the provider application
         relation_name (str, optional): the name of the relation
 
     Attributes:
-        provider_charm (CharmBase): variable for storing the provider application
+        charm (CharmBase): variable for storing the provider application
         relation_name (str): variable for storing the name of the relation
     """
 
-    def __init__(self, provider_charm: CharmBase, relation_name: str):
-        super().__init__(provider_charm, relation_name)
-        self.provider_charm = provider_charm
+    def __init__(self, charm: CharmBase, relation_name: Optional[str] = DEFAULT_RELATION_NAME):
+        super().__init__(charm, relation_name)
+        self.charm = charm
         self.relation_name = relation_name
 
-    def send_k8s_svc_info_relation_data(
+    def send_data(
         self,
         svc_name: str,
         svc_port: str,
@@ -284,12 +294,17 @@ class KubernetesServiceInfoProviderWrapper(Object):
             svc_name (str): the name of the Kubernetes Service the provider knows about
             svc_port (str): the port number of the Kubernetes Service the provider knows about
         """
+        # Validate unit is leader to send data; otherwise return
+        if not self.charm.model.unit.is_leader():
+            logger.info(
+                "KubernetesServiceInfoProvider handled send_data event when it is not the leader. Skipping event - no data sent."
+            )
         # Update the relation data bag with a Kubernetes Service information
-        relations = self.model.relations[self.relation_name]
+        relations = self.charm.model.relations[self.relation_name]
 
         # Update relation data
         for relation in relations:
-            relation.data[self.provider_charm.app].update(
+            relation.data[self.charm.app].update(
                 {
                     "svc_name": svc_name,
                     "svc_port": svc_port,
