@@ -146,18 +146,62 @@ class KubernetesServiceInfoObject(BaseModel):
 
 
 class KubernetesServiceInfoRequirer(Object):
-    """Base class that represents a requirer relation end.
+    """Implement the Requirer end of the Kubernetes Service Info relation.
+
+    Observes the relation events and get data of a related application.
 
     Args:
-        requirer_charm (CharmBase): the requirer application
+        charm (CharmBase): the provider application
+        refresh_event: (list, optional): list of BoundEvents that this manager should handle.  Use this to update
+                       the data sent on this relation on demand.
+        relation_name (str, optional): the name of the relation
+
+    Attributes:
+        charm (CharmBase): variable for storing the requirer application
+        relation_name (str): variable for storing the name of the relation
+    """
+
+    def __init__(
+        self,
+        charm: CharmBase,
+        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+        relation_name: Optional[str] = DEFAULT_RELATION_NAME,
+    ):
+        super().__init__(charm, relation_name)
+        self.charm = charm
+        self.relation_name = relation_name
+        self._requirer_wrapper = KubernetesServiceInfoRequirerWrapper(
+            self.charm, self.relation_name
+        )
+
+        self.framework.observe(self.charm.on.leader_elected, self._get_data)
+
+        self.framework.observe(self.charm.on[self.relation_name].relation_created, self._get_data)
+
+        if refresh_event:
+            if not isinstance(refresh_event, (tuple, list)):
+                refresh_event = [refresh_event]
+            for evt in refresh_event:
+                self.framework.observe(evt, self._send_data)
+
+    def _get_data(self, _):
+        """Serve as an event handler for getting the Kubernetes Service information."""
+        self._requirer_wrapper.get_data()
+
+
+class KubernetesServiceInfoRequirerWrapper(Object):
+    """Wrapper for the relation data getting logic.
+
+    Args:
+        charm (CharmBase): the requirer application
         relation_name (str, optional): the name of the relation
 
     Attributes:
         relation_name (str): variable for storing the name of the relation
     """
 
-    def __init__(self, requirer_charm, relation_name: Optional[str] = DEFAULT_RELATION_NAME):
-        super().__init__(requirer_charm, relation_name)
+    def __init__(self, charm, relation_name: Optional[str] = DEFAULT_RELATION_NAME):
+        super().__init__(charm, relation_name)
         self.relation_name = relation_name
 
     @staticmethod
@@ -170,7 +214,6 @@ class KubernetesServiceInfoRequirer(Object):
         Raises:
             KubernetesServiceInfoRelationDataMissingError if data is missing or incomplete
             KubernetesServiceInfoRelationMissingError: if there is no related application
-            ops.model.TooManyRelatedAppsError: if there is more than one related application
         """
         # Raise if there is no related application
         if not relation:
@@ -202,6 +245,7 @@ class KubernetesServiceInfoRequirer(Object):
         Raises:
             KubernetesServiceInfoRelationDataMissingError: if data is missing entirely or some attributes
             KubernetesServiceInfoRelationMissingError: if there is no related application
+            ops.model.TooManyRelatedAppsError: if there is more than one related application
         """
         # Validate relation data
         # Raises TooManyRelatedAppsError if related to more than one app
@@ -217,7 +261,9 @@ class KubernetesServiceInfoRequirer(Object):
 
 
 class KubernetesServiceInfoProvider(Object):
-    """Base class that represents the provider end of the Kubernetes Service info relation.
+    """Implement the Provider end of the Kubernetes Service Info relation.
+
+    Observes relation events to send data to related applications.
 
     Args:
         charm (CharmBase): the provider application
