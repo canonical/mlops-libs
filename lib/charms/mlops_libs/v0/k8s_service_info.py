@@ -256,9 +256,7 @@ class KubernetesServiceInfoRequirerWrapper(Object):
         # Get relation data from remote app
         relation_data = relation.data[relation.app]
 
-        return KubernetesServiceInfoObject(
-            name=relation_data["name"], port=relation_data["port"]
-        )
+        return KubernetesServiceInfoObject(name=relation_data["name"], port=relation_data["port"])
 
 
 class KubernetesServiceInfoProvider(Object):

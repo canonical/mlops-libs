@@ -187,9 +187,7 @@ def test_requirer_wrapper_get_data_passes(requirer_charm_harness):
     )
 
     # Get the relation data
-    expected_data = KubernetesServiceInfoObject(
-        name=data_dict["name"], port=data_dict["port"]
-    )
+    expected_data = KubernetesServiceInfoObject(name=data_dict["name"], port=data_dict["port"])
     actual_relation_data = requirer_charm_harness.charm._k8s_svc_info_requirer.get_data()
 
     # Assert returns dictionary with expected values
