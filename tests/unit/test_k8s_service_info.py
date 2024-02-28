@@ -45,7 +45,7 @@ def provider_charm_harness():
     return Harness(GenericCharm, meta=PROVIDER_CHARM_META)
 
 
-def test_requirer_data_in_relation_passes(requirer_charm_harness):
+def test_requirer_get_data_automatically_passes(requirer_charm_harness):
     """Assert the relation data is as expected."""
     # Initial configuration
     requirer_charm_harness.set_model_name("test-model")
@@ -134,12 +134,12 @@ def test_validate_relation_raises_data_missing_attribute(requirer_charm_harness)
     )
 
     # Add and update relation
-    faulty_relation_data = {"svc_name": "name"}
+    faulty_relation_data = {"name": "name"}
     requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=faulty_relation_data)
 
     with pytest.raises(KubernetesServiceInfoRelationDataMissingError) as error:
         requirer_charm_harness.charm._k8s_svc_info_requirer.get_data()
-    assert str(error.value) == f"Missing attributes: ['svc_port'] in relation {TEST_RELATION_NAME}"
+    assert str(error.value) == f"Missing attributes: ['port'] in relation {TEST_RELATION_NAME}"
 
 
 def test_provider_sends_data_automatically_passes(provider_charm_harness):
@@ -153,8 +153,8 @@ def test_provider_sends_data_automatically_passes(provider_charm_harness):
     svc_port = "7878"
     provider_charm_harness.charm._k8s_svc_info_provider = KubernetesServiceInfoProvider(
         charm=provider_charm_harness.charm,
-        svc_name=svc_name,
-        svc_port=svc_port,
+        name=svc_name,
+        port=svc_port,
         relation_name=TEST_RELATION_NAME,
     )
 
@@ -166,8 +166,8 @@ def test_provider_sends_data_automatically_passes(provider_charm_harness):
     for relation in relations:
         actual_relation_data = relation.data[provider_charm_harness.charm.app]
         # Assert returns dictionary with expected values
-        assert actual_relation_data.get("svc_name") == svc_name
-        assert actual_relation_data.get("svc_port") == svc_port
+        assert actual_relation_data.get("name") == svc_name
+        assert actual_relation_data.get("port") == svc_port
 
 
 def test_requirer_wrapper_get_data_passes(requirer_charm_harness):
@@ -178,7 +178,7 @@ def test_requirer_wrapper_get_data_passes(requirer_charm_harness):
     requirer_charm_harness.begin()
 
     # Add and update relation
-    data_dict = {"svc_name": "some-service", "svc_port": "7878"}
+    data_dict = {"name": "some-service", "port": "7878"}
     requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
 
     # Instantiate KubernetesServiceInfoRequirerWrapper class
@@ -188,7 +188,7 @@ def test_requirer_wrapper_get_data_passes(requirer_charm_harness):
 
     # Get the relation data
     expected_data = KubernetesServiceInfoObject(
-        name=data_dict["svc_name"], port=data_dict["svc_port"]
+        name=data_dict["name"], port=data_dict["port"]
     )
     actual_relation_data = requirer_charm_harness.charm._k8s_svc_info_requirer.get_data()
 
@@ -213,11 +213,11 @@ def test_provider_wrapper_send_data_passes(provider_charm_harness):
     # Send relation data
     relation_data = KubernetesServiceInfoObject(name="some-service", port="7878")
     provider_charm_harness.charm._k8s_svc_info_provider.send_data(
-        svc_name=relation_data.name, svc_port=relation_data.port
+        name=relation_data.name, port=relation_data.port
     )
     relations = provider_charm_harness.model.relations[TEST_RELATION_NAME]
     for relation in relations:
         actual_relation_data = relation.data[provider_charm_harness.charm.app]
         # Assert returns dictionary with expected values
-        assert actual_relation_data.get("svc_name") == relation_data.name
-        assert actual_relation_data.get("svc_port") == relation_data.port
+        assert actual_relation_data.get("name") == relation_data.name
+        assert actual_relation_data.get("port") == relation_data.port

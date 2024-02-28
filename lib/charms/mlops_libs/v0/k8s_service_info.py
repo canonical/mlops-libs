@@ -71,7 +71,7 @@ class ProviderCharm(CharmBase):
     def _some_event_handler(self, ...):
         # This will update the relation data bag with the Service name and port
         try:
-            self._k8s_svc_info_provider.send_data(svc_name, svc_port)
+            self._k8s_svc_info_provider.send_data(name, port)
         except KubernetesServiceInfoRelationError as error:
             "your error handler goes here"
 ```
@@ -79,9 +79,9 @@ class ProviderCharm(CharmBase):
 ## Relation data
 
 The data shared by this library is:
-* svc_name: the name of the Kubernetes Service
+* name: the name of the Kubernetes Service
   as it appears in the resource metadata, e.g. "metadata-grpc-service".
-* svc_port: the port of the Kubernetes Service
+* port: the port of the Kubernetes Service
 """
 
 import logging
@@ -106,7 +106,7 @@ LIBPATCH = 1
 # across the provider and requirer.
 DEFAULT_RELATION_NAME = "k8s-service-info"
 DEFAULT_INTERFACE_NAME = "k8s-service"
-REQUIRED_ATTRIBUTES = ["svc_name", "svc_port"]
+REQUIRED_ATTRIBUTES = ["name", "port"]
 
 logger = logging.getLogger(__name__)
 
@@ -250,13 +250,14 @@ class KubernetesServiceInfoRequirerWrapper(Object):
         # Validate relation data
         # Raises TooManyRelatedAppsError if related to more than one app
         relation = self.model.get_relation(self.relation_name)
+
         self._validate_relation(relation=relation)
 
         # Get relation data from remote app
         relation_data = relation.data[relation.app]
 
         return KubernetesServiceInfoObject(
-            name=relation_data["svc_name"], port=relation_data["svc_port"]
+            name=relation_data["name"], port=relation_data["port"]
         )
 
 
@@ -267,8 +268,8 @@ class KubernetesServiceInfoProvider(Object):
 
     Args:
         charm (CharmBase): the provider application
-        svc_name (str): the name of the Kubernetes Service the provider knows about
-        svc_port (str): the port number of the Kubernetes Service the provider knows about
+        name (str): the name of the Kubernetes Service the provider knows about
+        port (str): the port number of the Kubernetes Service the provider knows about
         refresh_event: (list, optional): list of BoundEvents that this manager should handle.  Use this to update
                        the data sent on this relation on demand.
         relation_name (str, optional): the name of the relation
@@ -281,19 +282,19 @@ class KubernetesServiceInfoProvider(Object):
     def __init__(
         self,
         charm: CharmBase,
-        svc_name: str,
-        svc_port: str,
+        name: str,
+        port: str,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
         relation_name: Optional[str] = DEFAULT_RELATION_NAME,
     ):
         super().__init__(charm, relation_name)
         self.charm = charm
         self.relation_name = relation_name
-        self._requirer_wrapper = KubernetesServiceInfoProviderWrapper(
+        self._provider_wrapper = KubernetesServiceInfoProviderWrapper(
             self.charm, self.relation_name
         )
-        self._svc_name = svc_name
-        self._svc_port = svc_port
+        self._svc_name = name
+        self._svc_port = port
 
         self.framework.observe(self.charm.on.leader_elected, self._send_data)
 
@@ -307,7 +308,7 @@ class KubernetesServiceInfoProvider(Object):
 
     def _send_data(self, _):
         """Serve as an event handler for sending the Kubernetes Service information."""
-        self._requirer_wrapper.send_data(self._svc_name, self._svc_port)
+        self._provider_wrapper.send_data(self._svc_name, self._svc_port)
 
 
 class KubernetesServiceInfoProviderWrapper(Object):
@@ -329,21 +330,22 @@ class KubernetesServiceInfoProviderWrapper(Object):
 
     def send_data(
         self,
-        svc_name: str,
-        svc_port: str,
+        name: str,
+        port: str,
     ) -> None:
         """Update the relation data bag with data from a Kubernetes Service.
 
         This method will complete successfully even if there are no related applications.
 
         Args:
-            svc_name (str): the name of the Kubernetes Service the provider knows about
-            svc_port (str): the port number of the Kubernetes Service the provider knows about
+            name (str): the name of the Kubernetes Service the provider knows about
+            port (str): the port number of the Kubernetes Service the provider knows about
         """
         # Validate unit is leader to send data; otherwise return
         if not self.charm.model.unit.is_leader():
             logger.info(
-                "KubernetesServiceInfoProvider handled send_data event when it is not the leader. Skipping event - no data sent."
+                "KubernetesServiceInfoProvider handled send_data event when it is not the leader."
+                "Skipping event - no data sent."
             )
         # Update the relation data bag with a Kubernetes Service information
         relations = self.charm.model.relations[self.relation_name]
@@ -352,7 +354,7 @@ class KubernetesServiceInfoProviderWrapper(Object):
         for relation in relations:
             relation.data[self.charm.app].update(
                 {
-                    "svc_name": svc_name,
-                    "svc_port": svc_port,
+                    "name": name,
+                    "port": port,
                 }
             )
