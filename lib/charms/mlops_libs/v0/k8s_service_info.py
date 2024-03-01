@@ -87,8 +87,8 @@ The data shared by this library is:
 import logging
 from typing import List, Optional, Union
 
-from ops.charm import CharmBase
-from ops.framework import BoundEvent, Object
+from ops.charm import CharmBase, RelationEvent
+from ops.framework import BoundEvent, EventSource, Object, ObjectEvents
 from ops.model import Relation
 from pydantic import BaseModel
 
@@ -133,6 +133,16 @@ class KubernetesServiceInfoRelationDataMissingError(KubernetesServiceInfoRelatio
         super().__init__(self.message)
 
 
+class KubernetesServiceInfoUpdatedEvent(RelationEvent):
+    """Indicates the Kubernetes Service Info data was updated."""
+
+
+class KubernetesServiceInfoEvents(ObjectEvents):
+    """Events for the Kubernetes Service Info library."""
+
+    updated = EventSource(KubernetesServiceInfoUpdatedEvent)
+
+
 class KubernetesServiceInfoObject(BaseModel):
     """Representation of a Kubernetes Service info object.
 
@@ -150,16 +160,20 @@ class KubernetesServiceInfoRequirer(Object):
 
     Observes the relation events and get data of a related application.
 
+    This library emits:
+    * KubernetesServiceInfoUpdatedEvent: when data received on the relation is updated.
+
     Args:
         charm (CharmBase): the provider application
-        refresh_event: (list, optional): list of BoundEvents that this manager should handle.  Use this to update
-                       the data sent on this relation on demand.
+        refresh_event: (list, optional): list of BoundEvents that this manager should handle.
+                       Use this to update the data sent on this relation on demand.
         relation_name (str, optional): the name of the relation
 
     Attributes:
         charm (CharmBase): variable for storing the requirer application
         relation_name (str): variable for storing the name of the relation
     """
+    on = KubernetesServiceInfoEvents()
 
     def __init__(
         self,
@@ -168,25 +182,37 @@ class KubernetesServiceInfoRequirer(Object):
         relation_name: Optional[str] = DEFAULT_RELATION_NAME,
     ):
         super().__init__(charm, relation_name)
-        self.charm = charm
-        self.relation_name = relation_name
+        self._charm = charm
+        self._relation_name = relation_name
         self._requirer_wrapper = KubernetesServiceInfoRequirerWrapper(
-            self.charm, self.relation_name
+            self._charm, self._relation_name
         )
 
-        self.framework.observe(self.charm.on.leader_elected, self._get_data)
+        self.framework.observe(
+            self._charm.on[self._relation_name].relation_changed, self._on_relation_changed
+        )
 
-        self.framework.observe(self.charm.on[self.relation_name].relation_created, self._get_data)
+        self.framework.observe(
+            self._charm.on[self._relation_name].relation_broken, self._on_relation_broken
+        )
 
         if refresh_event:
             if not isinstance(refresh_event, (tuple, list)):
                 refresh_event = [refresh_event]
             for evt in refresh_event:
-                self.framework.observe(evt, self._send_data)
+                self.framework.observe(evt, self._on_relation_changed)
 
-    def _get_data(self, _):
-        """Serve as an event handler for getting the Kubernetes Service information."""
-        self._requirer_wrapper.get_data()
+    def get_data(self) -> KubernetesServiceInfoObject:
+        """Return a KubernetesServiceInfoObject."""
+        return self._requirer_wrapper.get_data()
+
+    def _on_relation_changed(self, event: BoundEvent) -> None:
+        """Handle relation-changed event for this relation."""
+        self.on.updated.emit(event.relation)
+
+    def _on_relation_broken(self, event: BoundEvent) -> None:
+        """Handle relation-broken event for this relation."""
+        self.on.updated.emit(event.relation)
 
 
 class KubernetesServiceInfoRequirerWrapper(Object):
@@ -304,7 +330,7 @@ class KubernetesServiceInfoProvider(Object):
             for evt in refresh_event:
                 self.framework.observe(evt, self._send_data)
 
-    def _send_data(self, _):
+    def _send_data(self, _) -> None:
         """Serve as an event handler for sending the Kubernetes Service information."""
         self._provider_wrapper.send_data(self._svc_name, self._svc_port)
 

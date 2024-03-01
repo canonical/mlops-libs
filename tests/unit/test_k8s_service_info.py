@@ -45,30 +45,51 @@ def provider_charm_harness():
     return Harness(GenericCharm, meta=PROVIDER_CHARM_META)
 
 
-def test_requirer_get_data_automatically_passes(requirer_charm_harness):
+def test_requirer_get_data_from_requirer(requirer_charm_harness):
     """Assert the relation data is as expected."""
     # Initial configuration
     requirer_charm_harness.set_model_name("test-model")
     requirer_charm_harness.set_leader(True)
     requirer_charm_harness.begin()
 
-    # Add and update relation
-    expected_data = KubernetesServiceInfoObject(name="some-service", port="7878")
-    data_dict = {"svc_name": expected_data.name, "svc_port": expected_data.port}
-    rel_id = requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
-
     # Instantiate KubernetesServiceInfoRequirerWrapper class
     requirer_charm_harness.charm._k8s_svc_info_requirer = KubernetesServiceInfoRequirer(
         requirer_charm_harness.charm, relation_name=TEST_RELATION_NAME
     )
 
+    # Add and update relation
+    expected_data = KubernetesServiceInfoObject(name="some-service", port="7878")
+    data_dict = {"name": expected_data.name, "port": expected_data.port}
+    rel_id = requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
+
     # Get the relation data
-    actual_relation_data = requirer_charm_harness.get_relation_data(rel_id, "app")
+    actual_relation_data = requirer_charm_harness.charm._k8s_svc_info_requirer.get_data()
 
     # Assert returns dictionary with expected values
-    assert actual_relation_data["svc_name"] == expected_data.name
-    assert actual_relation_data["svc_port"] == expected_data.port
+    assert actual_relation_data == expected_data
 
+
+def test_get_k8s_svc_info_on_refresh_event(requirer_charm_harness):
+    """Test the Provider correctly handles the event set in refresh_event."""
+    # Initial configuration
+    requirer_charm_harness.set_model_name("test-model")
+    requirer_charm_harness.set_leader(True)
+    requirer_charm_harness.begin()
+
+    # Instantiate KubernetesServiceInfoRequirerWrapper class
+    requirer_charm_harness.charm._k8s_svc_info_requirer = KubernetesServiceInfoRequirer(
+        requirer_charm_harness.charm,
+        relation_name=TEST_RELATION_NAME,
+        refresh_event=requirer_charm_harness.charm.on[TEST_RELATION_NAME].relation_joined,
+    )
+
+    # Add and update relation
+    expected_data = KubernetesServiceInfoObject(name="some-service", port="7878")
+    data_dict = {"name": expected_data.name, "port": expected_data.port}
+    rel_id = requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
+    relation = requirer_charm_harness.charm.framework.model.get_relation(TEST_RELATION_NAME, rel_id)
+    requirer_charm_harness.charm.on[TEST_RELATION_NAME].relation_joined.emit(relation)
+   
 
 def test_check_raise_too_many_relations(requirer_charm_harness):
     """Assert that TooManyRelatedAppsError is raised if more than one application is related."""
