@@ -60,7 +60,7 @@ def test_requirer_get_data_from_requirer(requirer_charm_harness):
     # Add and update relation
     expected_data = KubernetesServiceInfoObject(name="some-service", port="7878")
     data_dict = {"name": expected_data.name, "port": expected_data.port}
-    rel_id = requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
+    requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
 
     # Get the relation data
     actual_relation_data = requirer_charm_harness.charm._k8s_svc_info_requirer.get_data()
@@ -87,9 +87,11 @@ def test_get_k8s_svc_info_on_refresh_event(requirer_charm_harness):
     expected_data = KubernetesServiceInfoObject(name="some-service", port="7878")
     data_dict = {"name": expected_data.name, "port": expected_data.port}
     rel_id = requirer_charm_harness.add_relation(TEST_RELATION_NAME, "app", app_data=data_dict)
-    relation = requirer_charm_harness.charm.framework.model.get_relation(TEST_RELATION_NAME, rel_id)
+    relation = requirer_charm_harness.charm.framework.model.get_relation(
+        TEST_RELATION_NAME, rel_id
+    )
     requirer_charm_harness.charm.on[TEST_RELATION_NAME].relation_joined.emit(relation)
-   
+
 
 def test_check_raise_too_many_relations(requirer_charm_harness):
     """Assert that TooManyRelatedAppsError is raised if more than one application is related."""

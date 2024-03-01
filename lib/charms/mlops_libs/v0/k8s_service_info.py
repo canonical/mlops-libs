@@ -173,6 +173,7 @@ class KubernetesServiceInfoRequirer(Object):
         charm (CharmBase): variable for storing the requirer application
         relation_name (str): variable for storing the name of the relation
     """
+
     on = KubernetesServiceInfoEvents()
 
     def __init__(
