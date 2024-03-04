@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import pytest
+from charms.harness_extensions.v0.capture_events import capture
 from charms.mlops_libs.v0.k8s_service_info import (
     KubernetesServiceInfoObject,
     KubernetesServiceInfoProvider,
@@ -11,6 +12,7 @@ from charms.mlops_libs.v0.k8s_service_info import (
     KubernetesServiceInfoRelationMissingError,
     KubernetesServiceInfoRequirer,
     KubernetesServiceInfoRequirerWrapper,
+    KubernetesServiceInfoUpdatedEvent,
 )
 from charms.harness_extensions.v0.capture_events import capture
 from ops.charm import CharmBase
@@ -93,7 +95,7 @@ def test_get_k8s_svc_info_on_refresh_event(requirer_charm_harness):
     )
 
     # Assert that we emit an event for data being updated
-    with capture(harness.charm, KubernetesServiceInfoUpdatedEvent):
+    with capture(requirer_charm_harness, KubernetesServiceInfoUpdatedEvent):
         requirer_charm_harness.charm.on[TEST_RELATION_NAME].relation_joined.emit(relation)
 
 
