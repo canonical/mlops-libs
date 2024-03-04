@@ -14,7 +14,6 @@ from charms.mlops_libs.v0.k8s_service_info import (
     KubernetesServiceInfoRequirerWrapper,
     KubernetesServiceInfoUpdatedEvent,
 )
-from charms.harness_extensions.v0.capture_events import capture
 from ops.charm import CharmBase
 from ops.model import TooManyRelatedAppsError
 from ops.testing import Harness
