@@ -12,6 +12,7 @@ from charms.mlops_libs.v0.k8s_service_info import (
     KubernetesServiceInfoRequirer,
     KubernetesServiceInfoRequirerWrapper,
 )
+from charms.harness_extensions.v0.capture_events import capture
 from ops.charm import CharmBase
 from ops.model import TooManyRelatedAppsError
 from ops.testing import Harness
@@ -90,7 +91,10 @@ def test_get_k8s_svc_info_on_refresh_event(requirer_charm_harness):
     relation = requirer_charm_harness.charm.framework.model.get_relation(
         TEST_RELATION_NAME, rel_id
     )
-    requirer_charm_harness.charm.on[TEST_RELATION_NAME].relation_joined.emit(relation)
+
+    # Assert that we emit an event for data being updated
+    with capture(harness.charm, KubernetesServiceInfoUpdatedEvent):
+        requirer_charm_harness.charm.on[TEST_RELATION_NAME].relation_joined.emit(relation)
 
 
 def test_check_raise_too_many_relations(requirer_charm_harness):
