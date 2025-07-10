@@ -44,3 +44,52 @@ skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 [tool.pyright]
 include = ["src/**.py"]
 
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.charm]
+optional = true
+
+[tool.poetry.group.charm.dependencies]
+ops = "^3.0.0"
+pydantic = "^2.11.7"
+pyyaml = "^6.0.2"
+
+[tool.poetry.group.fmt]
+optional = true
+
+[tool.poetry.group.fmt.dependencies]
+black = "^25.1.0"
+ruff = "^0.12.2"
+
+[tool.poetry.group.lint]
+optional = true
+
+[tool.poetry.group.lint.dependencies]
+black = "^25.1.0"
+ruff = "^0.12.2"
+codespell = "^2.4.1"
+
+[tool.poetry.group.unit]
+optional = true
+
+[tool.poetry.group.unit.dependencies]
+pytest = "^8.4.1"
+
+[tool.poetry.group.unit.dependencies.coverage]
+extras = ["toml"]
+version = "^7.9.2"
+
+[tool.poetry.group.integration]
+optional = true
+
+[tool.poetry.group.integration.dependencies]
+juju = "<4.0"
+lightkube = "^0.17.2"
+lightkube-models = "^1.33.1.8"
+pytest = "^8.4.1"
+pytest-operator = "^0.43.1"
+
+[project]
+name = "mlops-libs"
+requires-python = ">=3.12,<4.0"

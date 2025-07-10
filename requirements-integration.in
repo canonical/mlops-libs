@@ -1,5 +1,0 @@
-juju<4.0
-lightkube
-lightkube-models
-pytest
-pytest-operator

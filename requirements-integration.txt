@@ -1,5 +1,0 @@
-juju~=3.1.0
-lightkube==0.17.2
-lightkube-models==1.33.1.8
-pytest==8.4.1
-pytest-operator==0.43.1
